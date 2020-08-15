@@ -1,33 +1,72 @@
 const MiAqara = require('./libs/MiAqara');
+const { EventEmitter } = require('events');
 
-let miAqaraSDK = {
-    _miAqara: null,
-    _start: false,
-    create (gateways, opts) {
+class MiAqaraSDK extends EventEmitter {
+    constructor(gateways, opts) {
+        super();
+
         this._miAqara = new MiAqara(gateways, opts);
-        this.extend();
-    },
-    start () {
-        this._miAqara.start();
-        this._start = true;
-    },
-    extend () { // 初始化后再添加更多接口
-        let miAqara = this._miAqara;
-        let gatewayHelper = miAqara.gatewayHelper;
-        let deviceHelper = miAqara.deviceHelper;
-        
-        this.parser = miAqara.parser;
-        this.getGatewayBySid = gatewayHelper.getBySid.bind(gatewayHelper);
-        this.getGatewayList = gatewayHelper.getGatewayList.bind(gatewayHelper);
-        this.controlLight = gatewayHelper.controlLight.bind(gatewayHelper);
-        this.getDeviceBySid = deviceHelper.getBySid.bind(deviceHelper);
-        this.getDevicesByGatewaySid = deviceHelper.getDevicesByGatewaySid.bind(deviceHelper);
-        this.getDevicesByGatewaySidAndModel = deviceHelper.getDevicesByGatewaySidAndModel.bind(deviceHelper);
-        this.getDevicesByModel = deviceHelper.getDevicesByModel.bind(deviceHelper);
-        this.getDeviceList = deviceHelper.getDeviceList.bind(deviceHelper);
-        this.change = deviceHelper.change.bind(deviceHelper);
+        this._miAqara.on('ready', (...args) => this.emit('ready', ...args));
+        this._miAqara.on('message', (...args) => this.emit('message', ...args));
+        this._miAqara.on('error', (...args) => this.emit('error', ...args));
+        this.started = false;
+        this.parser = this._miAqara.parser;
     }
-};
 
-// 收敛暴露的接口
-module.exports = miAqaraSDK;
+    start() {
+        this._miAqara.start();
+        this.started = true;
+    }
+
+    stop() {
+        if (this.started) {
+            this._miAqara.stop();
+        }
+    }
+
+    getGatewayBySid(sid) {
+        return this._miAqara.gatewayHelper.getBySid(sid);
+    }
+
+    getGatewayList() {
+        return this._miAqara.gatewayHelper.getGatewayList();
+    }
+
+    controlLight(params) {
+        return this._miAqara.gatewayHelper.controlLight(params);
+    }
+
+    getDeviceBySid(sid) {
+        return this._miAqara.deviceHelper.getBySid(sid);
+    }
+
+    getDevicesByGatewaySid(sid) {
+        return this._miAqara.deviceHelper.getDevicesByGatewaySid(sid);
+    }
+
+    getDevicesByGatewaySidAndModel(gatewaySid, model) {
+        return this._miAqara.deviceHelper.getDevicesByGatewaySidAndModel(
+            gatewaySid,
+            model
+        );
+    }
+
+    getDevicesByModel(model) {
+        return this._miAqara.deviceHelper.getDevicesByModel(model);
+    }
+
+    getDeviceList() {
+        return this._miAqara.deviceHelper.getDeviceList();
+    }
+
+    change(params) {
+        return this._miAqara.deviceHelper.change(params);
+    }
+}
+
+module.exports = {
+    MiAqaraSDK,
+    create(gateways, opts) {
+        return new MiAqaraSDK(gateways, opts);
+    },
+};

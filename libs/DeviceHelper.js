@@ -1,73 +1,71 @@
 /**
  * 子设备 & 传感器设备辅助类
  * */
+const { inspect } = require('util');
 const Device = require('./Device');
 const utils = require('./utils');
 
 class DeviceHelper {
-    constructor (platform) {
+    constructor(platform) {
         if (!platform) {
-            throw new Error('[DeviceHelper:constructor] Param error');
+            throw new Error('Bad parameters');
         }
-        this.devices = {};
+        this.devices = new Map();
         this.platform = platform;
     }
 
-    add (device) {
-        if (!device || !device.sid || this.devices.hasOwnProperty(device.sid)) {
+    add(device) {
+        if (!device || !device.sid || this.devices.has(device.sid)) {
             return;
         }
-        this.devices[device.sid] = device;
+        this.devices.set(device.sid, device);
     }
 
-    addOrUpdate (data) {
+    addOrUpdate(data) {
         if (!data) {
-            console.log('[DeviceHelper:addOrUpdate] data is null');
+            this.platform.logger.warn(
+                '[DeviceHelper:addOrUpdate] data is null'
+            );
             return;
         }
-        let sid = data.sid;
-        if (this.devices.hasOwnProperty(sid)) {
-            let device = this.devices[sid];
+        const sid = data.sid;
+        const nameInfo = this.platform.parser.getNameByModel(data.model);
+        if (this.devices.has(sid)) {
+            const device = this.devices.get(sid);
             device.update(data);
+            device.updateNameInfo(nameInfo);
         } else {
-            this.devices[sid] = new Device(data);
-        }
-
-        let nameInfo = this.platform.parser.getNameByModel(data.model);
-        if (nameInfo) {
-            this.devices[sid].name = nameInfo.name;
-            this.devices[sid].name_cn = nameInfo.name_cn;
+            const device = new Device(data);
+            this.devices.set(sid, device);
+            device.updateNameInfo(nameInfo);
         }
     }
 
-    remove (sid) {
-        delete this.devices[sid];
+    remove(sid) {
+        this.devices.delete(sid);
     }
 
-    uploadBySid (sid, data) {
-        if (this.devices.hasOwnProperty(sid)) {
-            let device = this.devices[sid];
+    updateBySid(sid, data) {
+        const device = this.devices.get(sid);
+        if (device) {
             device.update(data);
         }
     }
 
-    getBySid (sid) {
-        return this.devices[sid];
+    getBySid(sid) {
+        return this.devices.get(sid);
     }
 
     /**
      * 根据网关设备ID，查找子设备列表
      * */
-    getDevicesByGatewaySid (gatewaySid) {
-        let deviceMapsHelper = this.platform.deviceMapsHelper;
-        let deviceList = [];
-        let deviceIds = deviceMapsHelper.getDeviceSids(gatewaySid);
-        if (deviceIds) {
-            for (let i=0; i<deviceIds.length; i++) {
-                let sid = deviceIds[i];
-                if (this.devices.hasOwnProperty(sid)) {
-                    deviceList.push(this.devices[sid]);
-                }
+    getDevicesByGatewaySid(gatewaySid) {
+        const { deviceMapsHelper } = this.platform;
+        const deviceList = [];
+        for (const sid of deviceMapsHelper.getDeviceSids(gatewaySid) || []) {
+            const device = this.devices.get(sid);
+            if (device) {
+                deviceList.push(device);
             }
         }
         return deviceList;
@@ -78,40 +76,26 @@ class DeviceHelper {
      * @param {String} gatewaySid
      * @param {String} model
      * */
-    getDevicesByGatewaySidAndModel (gatewaySid, model) {
-        let deviceList = this.getDevicesByGatewaySid(gatewaySid);
-        let newDeviceList = [];
-        for (let i=0; i<deviceList.length; i++) {
-            if (model === deviceList[i].model) {
-                newDeviceList.push(deviceList[i]);
-            }
-        }
-        return newDeviceList;
+    getDevicesByGatewaySidAndModel(gatewaySid, model) {
+        return this.getDevicesByGatewaySid(gatewaySid).filter(
+            (device) => device.model === model
+        );
     }
 
     /**
      * 根据子设备型号获取子设备列表
      * */
-    getDevicesByModel (model) {
-        let deviceList = [];
-        for (let sid in this.devices) {
-            if (model === this.devices[sid].model) {
-                deviceList.push(this.devices[sid]);
-            }
-        }
-        return deviceList;
+    getDevicesByModel(model) {
+        return Array.from(this.devices.values()).filter(
+            (device) => device.model === model
+        );
     }
 
-    getDeviceList () {
-        let deviceList = [];
-        for (let key in this.devices) {
-            let value = this.devices[key];
-            deviceList.push(value);
-        }
-        return deviceList;
+    getDeviceList() {
+        return Array.from(this.devices.values());
     }
 
-    getAll () {
+    getAll() {
         return this.devices;
     }
 
@@ -120,34 +104,44 @@ class DeviceHelper {
      *
      * @param {String} sid 子设备ID
      * */
-    read (sid) {
-        console.log('[DeviceHelper:read] sid=%s', sid);
-        let deviceMapsHelper = this.platform.deviceMapsHelper;
-        let gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
-        let gatewayHelper = this.platform.gatewayHelper;
-        if (gatewaySid) {
-            let gateway = gatewayHelper.getBySid(gatewaySid);
-            if (gateway) {
-                this.platform.send(gateway.ip, gateway.port, {
-                    cmd: 'read',
-                    sid: sid
-                });
-            }
-        } else {
-            console.error('[DeviceHelper:read] sid:%s can not find gateway', sid);
+    read(sid) {
+        this.platform.logger.trace(`[DeviceHelper:read] sid: ${sid}`);
+        const deviceMapsHelper = this.platform.deviceMapsHelper;
+        const gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
+        if (!gatewaySid) {
+            this.platform.logger.error(
+                `[DeviceHelper:read] gateway of device sid: ${sid} not found`
+            );
+            return;
         }
+
+        const gatewayHelper = this.platform.gatewayHelper;
+        const gateway = gatewayHelper.getBySid(gatewaySid);
+        if (!gateway) {
+            this.platform.logger.error(
+                `[DeviceHelper:read] gateway sid: ${gatewaySid} does not exist`
+            );
+            return;
+        }
+
+        this.platform.send(gateway.ip, gateway.port, {
+            cmd: 'read',
+            sid: sid,
+        });
     }
 
     /**
      * 批量读取
      * */
-    readAll (sidList) {
-        console.log('[DeviceHelper:readAll] sidList=%s', sidList);
-        if (!sidList || sidList.length === 0) {
+    readAll(sidList) {
+        this.platform.logger.trace(
+            `[DeviceHelper:readAll] sidList: ${sidList}`
+        );
+        if (!sidList) {
             return;
         }
-        for (let i=0; i<sidList.length; i++) {
-            this.read(sidList[i]);
+        for (const sid of sidList) {
+            this.read(sid);
         }
     }
 
@@ -156,65 +150,101 @@ class DeviceHelper {
      *
      * @param {String} sid 子设备ID
      * */
-    write (sid) {
-        console.log('[DeviceHelper:write] sid=%s', sid);
-        let device = this.getBySid(sid);
-        let deviceMapsHelper = this.platform.deviceMapsHelper;
-        let gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
-        let gatewayHelper = this.platform.gatewayHelper;
-        if (device && gatewaySid) {
-            let gateway = gatewayHelper.getBySid(gatewaySid);
-            if (gateway) {
-                let msg = {
-                    cmd: 'write',
-                    model: device.model,
-                    sid: device.sid,
-                    short_id: device.short_id,
-                    data: Object.assign({}, device.data)
-                };
-                // 加密串
-                msg.data.key = utils.cipher(gateway.token, gateway.password, gateway.iv);
-                this.platform.send(gateway.ip, gateway.port, msg);
-            }
-        } else {
-            console.error('[DeviceHelper:read] sid:%s can not find', sid);
+    write(sid) {
+        this.platform.logger.trace(`[DeviceHelper:write] sid: ${sid}`);
+        const device = this.getBySid(sid);
+        if (!device) {
+            this.platform.logger.error(
+                `[DeviceHelper:write] device sid: ${sid} not found`
+            );
+            return;
         }
+
+        const deviceMapsHelper = this.platform.deviceMapsHelper;
+        const gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
+        if (!gatewaySid) {
+            this.platform.logger.error(
+                `[DeviceHelper:write] gateway of device sid: ${sid} not found`
+            );
+            return;
+        }
+
+        const gatewayHelper = this.platform.gatewayHelper;
+        const gateway = gatewayHelper.getBySid(gatewaySid);
+        if (!gateway) {
+            this.platform.logger.error(
+                `[DeviceHelper:read] gateway sid: ${gatewaySid} does not exist`
+            );
+            return;
+        }
+
+        const msg = {
+            cmd: 'write',
+            model: device.model,
+            sid: device.sid,
+            short_id: device.short_id,
+            data: Object.assign({}, device.data),
+        };
+        // 加密串
+        msg.data.key = utils.cipher(
+            gateway.token,
+            gateway.password,
+            gateway.iv
+        );
+        this.platform.send(gateway.ip, gateway.port, msg);
     }
 
     /**
      * 改变子设备状态
      * */
-    change ({sid, gatewaySid, model, data}) {
-        console.log('[DeviceHelper:change] sid=%s', sid);
+    change(options) {
+        const { sid, gatewaySid, model, data } = options;
+        this.platform.logger.trace(`[DeviceHelper:change] sid: ${sid}`);
         if (!data || !utils.isObject(data)) {
-            console.error('[DeviceHelper:change] Param error');
+            this.platform.logger.error(
+                `[DeviceHelper:change] Bad parameters: ${inspect(options)}`
+            );
             return;
         }
-        if (sid) { // 改变指定设备状态
-            let device = this.getBySid(sid);
+
+        if (sid) {
+            // 改变指定设备状态
+            const device = this.getBySid(sid);
             if (!device) {
-                console.error('[DeviceHelper:change] sid=%s, can not found', sid);
+                this.platform.logger.error(
+                    `[DeviceHelper:change] device sid: ${sid} not found`
+                );
                 return;
             }
             device.data = data;
             this.write(sid);
-        } else if (gatewaySid && model) {
-            let devices = this.getDevicesByGatewaySidAndModel(gatewaySid, model);
-            for (let i=0; i<devices.length; i++) {
-                devices[i].data = data;
-                this.write(devices[i].sid);
-            }
-        } else if (model) {
-            let devices = this.getDevicesByModel(model);
-            for (let i=0; i<devices.length; i++) {
-                devices[i].data = data;
-                this.write(devices[i].sid);
-            }
-        } else {
-            console.error('[DeviceHelper:change] Param error');
+            return;
         }
-    }
 
+        if (gatewaySid && model) {
+            const devices = this.getDevicesByGatewaySidAndModel(
+                gatewaySid,
+                model
+            );
+            for (const device of devices) {
+                device.data = data;
+                this.write(device.sid);
+            }
+            return;
+        }
+
+        if (model) {
+            const devices = this.getDevicesByModel(model);
+            for (const device of devices) {
+                device.data = data;
+                this.write(device.sid);
+            }
+        }
+
+        this.platform.logger.error(
+            `[DeviceHelper:change] Bad parameters: ${inspect(options)}`
+        );
+    }
 }
 
 module.exports = DeviceHelper;

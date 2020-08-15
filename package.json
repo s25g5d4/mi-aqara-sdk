@@ -1,20 +1,30 @@
 {
-  "name": "mi-aqara-sdk",
+  "name": "@s25g5d4/mi-aqara-sdk",
   "version": "1.0.0",
   "description": "xiaomi & aqara sdk",
   "main": "index.js",
-  "scripts": {
-  },
+  "scripts": {},
   "keywords": [
     "mijia",
     "aqara",
     "xiaomi",
     "sdk"
   ],
-  "author": "jsonzhou",
+  "author": "Zong Jhe Wu <s25g5d4@gmail.com>",
+  "contributors": [
+    "jsonzhou (https://github.com/zzyss86)"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zzyss86/mi-aqara-sdk.git"
+    "url": "git+https://github.com/s25g5d4/mi-aqara-sdk.git"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "tracer": "^1.1.3"
+  },
+  "bugs": {
+    "url": "https://github.com/s25g5d4/mi-aqara-sdk/issues"
+  },
+  "homepage": "https://github.com/s25g5d4/mi-aqara-sdk#readme",
+  "devDependencies": {}
 }

@@ -6,54 +6,54 @@ const Gateway = require('./Gateway');
 const utils = require('./utils');
 
 class GatewayHelper {
-    constructor (platform) {
+    constructor(platform) {
         if (!platform) {
-            throw new Error('[GatewayHelper:constructor] Param error');
+            throw new Error('Bad parameters');
         }
-        this.gateways = {}; // 网关列表，sid->Gateway
+        this.gateways = new Map(); // 网关列表，sid->Gateway
         this.platform = platform;
     }
 
     /**
      * 添加
      * */
-    add (gateway) {
-        if (!gateway || !gateway.sid || this.gateways.hasOwnProperty(gateway.sid)) {
+    add(gateway) {
+        if (!gateway || !gateway.sid || this.gateways.has(gateway.sid)) {
             return;
         }
-        this.gateways[gateway.sid] = gateway;
+        this.gateways.set(gateway.sid, gateway);
     }
 
-    addOrUpdate (data) {
+    addOrUpdate(data) {
         let sid = data.sid;
-        if (this.gateways.hasOwnProperty(sid)) {
-            let gateway = this.gateways[sid];
+        if (this.gateways.has(sid)) {
+            const gateway = this.gateways.get(sid);
             gateway.update(data);
         } else {
-            this.gateways[sid] = new Gateway(data);
+            this.gateways.set(sid, new Gateway(data));
         }
     }
 
     /**
      * 移除
      * */
-    remove (sid) {
-        delete this.gateways[sid];
+    remove(sid) {
+        this.gateways.delete(sid);
     }
 
     /**
      * 根据sid查找网关
      **/
-    getBySid (sid) {
-        return this.gateways[sid];
+    getBySid(sid) {
+        return this.gateways.get(sid);
     }
 
     /**
      * 根据sid更新网关的属性
      * */
-    uploadBySid (sid, data) {
-        if (this.gateways.hasOwnProperty(sid)) {
-            let gateway = this.gateways[sid];
+    updateBySid(sid, data) {
+        if (this.gateways.has(sid)) {
+            const gateway = this.gateways.get(sid);
             gateway.update(data);
         }
     }
@@ -61,31 +61,30 @@ class GatewayHelper {
     /**
      * 获取网关列表数组
      * */
-    getGatewayList () {
-        let list = [];
-        for (let key in this.gateways) {
-            let value = this.gateways[key];
-            list.push(value);
-        }
-        return list;
+    getGatewayList() {
+        return Array.from(this.gateways.values());
     }
 
-    getAll () {
+    getAll() {
         return this.gateways;
     }
 
     /**
      * 查询子设备id列表
      * */
-    getIdList (sid) {
-        console.log('[GatewayHelper:getIdList] sid:%s', sid);
-        let gateway = this.getBySid(sid);
+    getIdList(sid) {
+        this.platform.logger.trace(`[GatewayHelper:getIdList] sid: ${sid}`);
+        const gateway = this.getBySid(sid);
         if (gateway) {
             this.platform.send(gateway.ip, gateway.port, {
-                cmd: 'get_id_list'
+                cmd: 'get_id_list',
             });
         } else {
-            console.error('[GatewayHelper:getIdList] sid:%s is not exit', sid);
+            const msg = format(
+                '[GatewayHelper:getIdList] sid: %s does not exist',
+                sid
+            );
+            this.platform.logger.error(msg);
         }
     }
 
@@ -94,16 +93,20 @@ class GatewayHelper {
      *
      * @param {String} sid 网关设备ID
      * */
-    read (sid) {
-        console.log('[GatewayHelper:read] sid=%s', sid);
-        let gateway = this.getBySid(sid);
+    read(sid) {
+        this.platform.logger.trace(`[GatewayHelper:read] sid: ${sid}`);
+        const gateway = this.getBySid(sid);
         if (gateway) {
             this.platform.send(gateway.ip, gateway.port, {
                 cmd: 'read',
-                sid: sid
+                sid: sid,
             });
         } else {
-            console.error('[GatewayHelper:read] sid:%s can not find gateway', sid);
+            const msg = format(
+                '[GatewayHelper:read] sid: %s does not exist',
+                sid
+            );
+            this.platform.logger.error(msg);
         }
     }
 
@@ -113,21 +116,29 @@ class GatewayHelper {
      * @param {String} sid 网关设备ID
      * @param {Object} data 写入网关的数据
      * */
-    write (sid, data) {
-        console.log('[GatewayHelper:write] sid=%s', sid);
-        let gateway = this.getBySid(sid);
+    write(sid, data) {
+        this.platform.logger.trace(`[GatewayHelper:write] sid: ${sid}`);
+        const gateway = this.getBySid(sid);
         if (gateway) {
-            let msg = {
+            const msg = {
                 cmd: 'write',
                 model: 'gateway',
                 sid: gateway.sid,
-                data: Object.assign({}, data)
+                data: Object.assign({}, data),
             };
             // 加密串
-            msg.data.key = utils.cipher(gateway.token, gateway.password, gateway.iv);
+            msg.data.key = utils.cipher(
+                gateway.token,
+                gateway.password,
+                gateway.iv
+            );
             this.platform.send(gateway.ip, gateway.port, msg);
         } else {
-            console.error('[GatewayHelper:read] sid:%s can not find', sid);
+            const msg = format(
+                '[GatewayHelper:write] sid: %s does not exist',
+                sid
+            );
+            this.platform.logger.error(msg);
         }
     }
 
@@ -140,22 +151,28 @@ class GatewayHelper {
      * @param saturation 饱和度
      * @param brightness 亮度
      * */
-    controlLight({sid, power, hue, saturation, brightness}) {
+    controlLight({ sid, power, hue, saturation, brightness }) {
         let prepValue = 0;
-        if(power) {
-            if(!hue) {
+        if (power) {
+            if (!hue) {
                 hue = 0;
             }
-            if(!saturation) {
+            if (!saturation) {
                 saturation = 0 * 100;
             }
-            if(!brightness) {
+            if (!brightness) {
                 brightness = 50;
             }
-            let rgb = utils.hsb2rgb([hue, saturation/100, 1]);
-            prepValue = parseInt(utils.dec2hex(brightness, 2) + utils.dec2hex(rgb[0], 2) + utils.dec2hex(rgb[1], 2) + utils.dec2hex(rgb[2], 2), 16);
+            const rgb = utils.hsb2rgb([hue, saturation / 100, 1]);
+            prepValue = parseInt(
+                utils.dec2hex(brightness, 2) +
+                    utils.dec2hex(rgb[0], 2) +
+                    utils.dec2hex(rgb[1], 2) +
+                    utils.dec2hex(rgb[2], 2),
+                16
+            );
         }
-        this.write(sid, {rgb: prepValue});
+        this.write(sid, { rgb: prepValue });
     }
 }
 
