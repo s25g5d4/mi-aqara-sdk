@@ -122,6 +122,17 @@ module.exports = {
 
     defaultLogLevel: 'warn',
     logger(level) {
+        if (level === false) {
+            return {
+                log(){},
+                trace(){},
+                debug(){},
+                info(){},
+                warn(){},
+                error(){},
+                fatal(){},
+            };
+        }
         level = level || this.defaultLogLevel;
         return tracer.console({ level });
     },
