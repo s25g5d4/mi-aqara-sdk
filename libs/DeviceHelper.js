@@ -60,9 +60,9 @@ class DeviceHelper {
      * 根据网关设备ID，查找子设备列表
      * */
     getDevicesByGatewaySid(gatewaySid) {
-        const { deviceMapsHelper } = this.platform;
+        const { devicesMapHelper } = this.platform;
         const deviceList = [];
-        for (const sid of deviceMapsHelper.getDeviceSids(gatewaySid) || []) {
+        for (const sid of devicesMapHelper.getDeviceSids(gatewaySid) || []) {
             const device = this.devices.get(sid);
             if (device) {
                 deviceList.push(device);
@@ -106,8 +106,8 @@ class DeviceHelper {
      * */
     read(sid) {
         this.platform.logger.trace(`[DeviceHelper:read] sid: ${sid}`);
-        const deviceMapsHelper = this.platform.deviceMapsHelper;
-        const gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
+        const devicesMapHelper = this.platform.devicesMapHelper;
+        const gatewaySid = devicesMapHelper.getGatewaySidByDeviceSid(sid);
         if (!gatewaySid) {
             this.platform.logger.error(
                 `[DeviceHelper:read] gateway of device sid: ${sid} not found`
@@ -160,8 +160,8 @@ class DeviceHelper {
             return;
         }
 
-        const deviceMapsHelper = this.platform.deviceMapsHelper;
-        const gatewaySid = deviceMapsHelper.getGatewaySidByDeviceSid(sid);
+        const { devicesMapHelper } = this.platform;
+        const gatewaySid = devicesMapHelper.getGatewaySidByDeviceSid(sid);
         if (!gatewaySid) {
             this.platform.logger.error(
                 `[DeviceHelper:write] gateway of device sid: ${sid} not found`

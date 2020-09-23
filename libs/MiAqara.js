@@ -2,7 +2,7 @@ const dgram = require('dgram');
 const { EventEmitter } = require('events');
 const DeviceHelper = require('./DeviceHelper');
 const GatewayHelper = require('./GatewayHelper');
-const DeviceMapsHelper = require('./DeviceMapsHelper');
+const DevicesMapHelper = require('./DevicesMapHelper');
 const DeviceParser = require('./DeviceParser');
 const utils = require('./utils');
 
@@ -54,6 +54,7 @@ class MiAqara extends EventEmitter {
 
         // 读取设备计数
         this.readCount = 0;
+        this.ready = false;
 
         // 事件
         if (opts.onReady) {
@@ -63,7 +64,7 @@ class MiAqara extends EventEmitter {
             this.on('message', opts.onMessage);
         }
 
-        this.deviceMapsHelper = new DeviceMapsHelper();
+        this.devicesMapHelper = new DevicesMapHelper();
         this.gatewayHelper = new GatewayHelper(this);
         this.deviceHelper = new DeviceHelper(this);
         this.parser = DeviceParser;
@@ -150,7 +151,7 @@ class MiAqara extends EventEmitter {
         } else if (cmd === 'get_id_list_ack') {
             // get_id_list callback
             this.gatewayHelper.updateBySid(data.sid, data);
-            this.deviceMapsHelper.addOrUpdate(data.sid, data.data); // 更新网关与子设备的映射关系
+            this.devicesMapHelper.addOrUpdate(data.sid, data.data); // 更新网关与子设备的映射关系
             this.deviceHelper.readAll(data.data); // 批量读取子设备详细信息
             this.readCount += data.data.length;
         } else if (cmd === 'report') {
@@ -160,9 +161,10 @@ class MiAqara extends EventEmitter {
             // read callback
             this._addOrUpdate(data);
             this.readCount--;
-            if (this.readCount === 0) {
+            if (this.readCount === 0 && !this.ready) {
+                this.ready = true;
                 // 所有设备读取完毕，触发onRead事件
-                this.emit('ready', data);
+                this.emit('ready');
             }
         } else if (cmd === 'write_ack') {
             // write callback
@@ -192,6 +194,13 @@ class MiAqara extends EventEmitter {
         } else {
             // 子设备
             this.deviceHelper.addOrUpdate(data);
+            if (data.cmd === 'report' || data.cmd === 'heartbeat') {
+                const gw = this.devicesMapHelper.getGatewaySidByDeviceSid(data.sid);
+                if (!gw) {
+                    // update gateway devices list
+                    this.sendWhoisCommand();
+                }
+            }
         }
     }
 
@@ -215,6 +224,7 @@ class MiAqara extends EventEmitter {
      * 组播方式
      * */
     sendWhoisCommand() {
+        this.logger.warn('send whois');
         this.send(this.multicastAddress, this.multicastPort, {
             cmd: 'whois',
         });

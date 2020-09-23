@@ -1,8 +1,6 @@
 /**
  * 网关类
  * */
-const utils = require('./utils');
-
 class Gateway {
     /**
      * 实例实始化必须传 sid

@@ -1,10 +1,10 @@
+const Gateway = require('./Gateway');
+const utils = require('./utils');
+
 /**
  * 网关辅助类
  * 管理多个网关
  */
-const Gateway = require('./Gateway');
-const utils = require('./utils');
-
 class GatewayHelper {
     constructor(platform) {
         if (!platform) {

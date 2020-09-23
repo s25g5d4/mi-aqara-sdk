@@ -1,4 +1,6 @@
 const MiAqara = require('./libs/MiAqara');
+const Gateway = require('./libs/Gateway');
+const Device = require('./libs/Device');
 const { EventEmitter } = require('events');
 
 class MiAqaraSDK extends EventEmitter {
@@ -24,10 +26,19 @@ class MiAqaraSDK extends EventEmitter {
         }
     }
 
+    /**
+     *
+     * @param {string} sid
+     * @returns {Gateway}
+     */
     getGatewayBySid(sid) {
         return this._miAqara.gatewayHelper.getBySid(sid);
     }
 
+    /**
+     *
+     * @returns {Array<Gateway>}
+     */
     getGatewayList() {
         return this._miAqara.gatewayHelper.getGatewayList();
     }
@@ -36,14 +47,30 @@ class MiAqaraSDK extends EventEmitter {
         return this._miAqara.gatewayHelper.controlLight(params);
     }
 
+    /**
+     *
+     * @param {string} sid
+     * @returns {Device}
+     */
     getDeviceBySid(sid) {
         return this._miAqara.deviceHelper.getBySid(sid);
     }
 
+    /**
+     *
+     * @param {string} sid
+     * @returns {Array<Device>}
+     */
     getDevicesByGatewaySid(sid) {
         return this._miAqara.deviceHelper.getDevicesByGatewaySid(sid);
     }
 
+    /**
+     *
+     * @param {string} gatewaySid
+     * @param {string} model
+     * @returns {Array<Device>}
+     */
     getDevicesByGatewaySidAndModel(gatewaySid, model) {
         return this._miAqara.deviceHelper.getDevicesByGatewaySidAndModel(
             gatewaySid,
@@ -51,10 +78,19 @@ class MiAqaraSDK extends EventEmitter {
         );
     }
 
+    /**
+     *
+     * @param {string} model
+     * @returns {Array<Device>}
+     */
     getDevicesByModel(model) {
         return this._miAqara.deviceHelper.getDevicesByModel(model);
     }
 
+    /**
+     *
+     * @returns {Array<Device>}
+     */
     getDeviceList() {
         return this._miAqara.deviceHelper.getDeviceList();
     }
@@ -65,8 +101,5 @@ class MiAqaraSDK extends EventEmitter {
 }
 
 module.exports = {
-    MiAqaraSDK,
-    create(gateways, opts) {
-        return new MiAqaraSDK(gateways, opts);
-    },
+    MiAqaraSDK
 };
