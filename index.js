@@ -37,6 +37,19 @@ class MiAqaraSDK extends EventEmitter {
 
     /**
      *
+     * @param {string} sid
+     * @returns {Gateway}
+     */
+    getGatewayByDeviceSid(sid) {
+        const gw = this._miAqara.devicesMapHelper.getGatewaySidByDeviceSid(sid);
+        if (!gw) {
+            return null;
+        }
+        return this.getGatewayBySid(gw);
+    }
+
+    /**
+     *
      * @returns {Array<Gateway>}
      */
     getGatewayList() {
@@ -101,5 +114,5 @@ class MiAqaraSDK extends EventEmitter {
 }
 
 module.exports = {
-    MiAqaraSDK
+    MiAqaraSDK,
 };
