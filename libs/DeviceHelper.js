@@ -140,9 +140,12 @@ class DeviceHelper {
         if (!sidList) {
             return;
         }
-        for (const sid of sidList) {
-            this.read(sid);
-        }
+        (async () => {
+            for (const sid of sidList) {
+                this.read(sid);
+                await new Promise(ok => setTimeout(ok, 10));
+            }
+        })();
     }
 
     /**
