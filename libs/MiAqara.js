@@ -117,11 +117,16 @@ class MiAqara extends EventEmitter {
             if (!this.bindAddress) {
                 serverSocket.addMembership(this.multicastAddress);
             } else {
-                serverSocket.setMulticastInterface(this.bindAddress);
-                serverSocket.addMembership(
-                    this.multicastAddress,
-                    this.bindAddress
-                );
+                try {
+                    serverSocket.setMulticastInterface(this.bindAddress);
+                    serverSocket.addMembership(
+                        this.multicastAddress,
+                        this.bindAddress
+                    );
+                } catch(err) {
+                    this.logger.error(`socket error: ${err.toString()}`);
+                    this.emit('error', err);
+                }
             }
         });
         serverSocket.on('message', (msg) => this.parseMessage(msg));
