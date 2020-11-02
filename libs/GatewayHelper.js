@@ -1,4 +1,5 @@
 const Gateway = require('./Gateway');
+const { format } = require('util');
 const utils = require('./utils');
 
 /**
